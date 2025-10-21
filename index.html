@@ -1410,7 +1410,7 @@
                 doc.setFont(undefined, 'bold');
                 doc.text("Registros Detalhados", 15, y); y += 10;
                 
-                const logsInPeriod = appState.logHistory.filter(log => { const logDate = new Date(log.timestamp); return logDate >= startDate && logDate <= endDate; }).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                const logsInPeriod = appState.logHistory.filter(log => { const logDate = new Date(log.timestamp); return logDate >= startDate && logDate <= endDate; });
                 const newGroupedLogs = _.groupBy(logsInPeriod, log => new Date(log.timestamp).toISOString().split('T')[0]);
                 const sortedDateKeys = Object.keys(newGroupedLogs).sort();
 
@@ -1420,6 +1420,7 @@
                 for (const dateKey of sortedDateKeys) {
                     const date = new Date(dateKey + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
                     const logsForDay = newGroupedLogs[dateKey];
+                    logsForDay.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
 
                     if (y > 260) { doc.addPage(); y = 20; }
                     
@@ -2457,5 +2458,4 @@
     </script>
 </body>
 </html>
-
 
