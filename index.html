@@ -1437,13 +1437,26 @@
                         
                         const time = new Date(log.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
                         
-                        let title = log.type.charAt(0).toUpperCase() + log.type.slice(1);
-                        
-                        if (log.type === 'meal') title = log.rawData.mealType || 'Refeição';
-                        else if (log.type === 'insulin') title = log.rawData.insulinType.split(' ')[0] || 'Insulina';
-                        else if (log.type === 'medication') title = log.rawData.name;
-                        else if (log.type === 'glucose') title = 'Glicose';
-                        else if (log.type === 'activity') title = 'Atividade';
+                        let title;
+                        switch (log.type) {
+                            case 'glucose':
+                                title = 'Glicose';
+                                break;
+                            case 'insulin':
+                                title = log.rawData.insulinType.split(' ')[0] || 'Insulina';
+                                break;
+                            case 'meal':
+                                title = log.rawData.mealType || 'Refeição';
+                                break;
+                            case 'activity':
+                                title = 'Atividade';
+                                break;
+                            case 'medication':
+                                title = log.rawData.name || 'Medicamento';
+                                break;
+                            default:
+                                title = log.type;
+                        }
 
                         const value = log.value;
 
@@ -2458,4 +2471,5 @@
     </script>
 </body>
 </html>
+
 
