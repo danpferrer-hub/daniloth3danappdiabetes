@@ -1049,7 +1049,16 @@
                 const saveButton = modal.querySelector('.save-btn');
                 if (saveButton) {
                     const btnContent = saveButton.querySelector('.btn-content');
-                    btnContent.textContent = logId ? `Atualizar ${logId ? modalId.split('-')[0].charAt(0).toUpperCase() + modalId.split('-')[0].slice(1) : ''}` : `Salvar ${modalId.split('-')[0].charAt(0).toUpperCase() + modalId.split('-')[0].slice(1)}`;
+                    const typeTranslations = {
+                        glucose: 'Glicose',
+                        insulin: 'Insulina',
+                        meal: 'Refeição',
+                        activity: 'Atividade',
+                        medication: 'Medicamento'
+                    };
+                    const typeName = modalId.split('-')[0];
+                    const translatedName = typeTranslations[typeName] || typeName.charAt(0).toUpperCase() + typeName.slice(1);
+                    btnContent.textContent = logId ? `Atualizar ${translatedName}` : `Salvar ${translatedName}`;
                 }
 
                 if (logId) {
@@ -1374,8 +1383,11 @@
                 showToast("Análise da IA completa. Adicionando gráficos...");
                 
                 doc.setFontSize(16);
+                doc.setTextColor(0,0,0);
+                doc.setFont(undefined, 'bold');
                 doc.text("Análise Inteligente do Período", 15, y); y += 8;
                 doc.setFontSize(11);
+                doc.setFont(undefined, 'normal');
                 const splitText = doc.splitTextToSize(aiReportText.replace(/\*\*/g, ''), docWidth - 30);
                 doc.text(splitText, 15, y);
                 y += splitText.length * 5 + 10;
@@ -1387,6 +1399,7 @@
                     const chartImage = await createChartImage(trendChartConfig, 800, 400);
                     
                     doc.setFontSize(16);
+                    doc.setFont(undefined, 'bold');
                     doc.text("Gráfico de Tendência", 15, y); y += 8;
                     doc.addImage(chartImage, 'PNG', 15, y, docWidth - 30, (docWidth - 30) / 2);
                     y += ((docWidth - 30) / 2) + 10;
@@ -1394,17 +1407,76 @@
 
                 if (y > 250) { doc.addPage(); y = 20; }
                 doc.setFontSize(16);
-                doc.text("Registros Detalhados", 15, y); y += 8;
-                const logsInPeriod = appState.logHistory.filter(log => { const logDate = new Date(log.timestamp); return logDate >= startDate && logDate <= endDate; });
-                logsInPeriod.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp)).forEach(log => {
-                    if (y > 280) { doc.addPage(); y = 20; }
-                    doc.setFontSize(10); 
-                    let text = `${new Date(log.timestamp).toLocaleString('pt-BR')} - ${log.type}: ${log.value}`; 
-                    if(log.rawData.notes) { text += ` (Nota: ${log.rawData.notes})` }
-                    const wrappedText = doc.splitTextToSize(text, docWidth - 30);
-                    doc.text(wrappedText, 15, y); 
-                    y += wrappedText.length * 4 + 2;
-                });
+                doc.setFont(undefined, 'bold');
+                doc.text("Registros Detalhados", 15, y); y += 10;
+                
+                const logsInPeriod = appState.logHistory.filter(log => { const logDate = new Date(log.timestamp); return logDate >= startDate && logDate <= endDate; }).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+                const newGroupedLogs = _.groupBy(logsInPeriod, log => new Date(log.timestamp).toISOString().split('T')[0]);
+                const sortedDateKeys = Object.keys(newGroupedLogs).sort();
+
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(0,0,0);
+
+                for (const dateKey of sortedDateKeys) {
+                    const date = new Date(dateKey + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                    const logsForDay = newGroupedLogs[dateKey];
+
+                    if (y > 260) { doc.addPage(); y = 20; }
+                    
+                    doc.setFontSize(12);
+                    doc.setFont(undefined, 'bold');
+                    doc.setFillColor(243, 232, 255); // A light purple color
+                    doc.rect(15, y, docWidth - 30, 8, 'F');
+                    doc.setTextColor(107, 33, 168); // A dark purple color
+                    doc.text(date, docWidth / 2, y + 5.5, { align: 'center' });
+                    y += 12;
+
+                    logsForDay.forEach(log => {
+                        if (y > 270) { doc.addPage(); y = 20; }
+                        
+                        const time = new Date(log.timestamp).toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+                        
+                        let title = log.type.charAt(0).toUpperCase() + log.type.slice(1);
+                        
+                        if (log.type === 'meal') title = log.rawData.mealType || 'Refeição';
+                        else if (log.type === 'insulin') title = log.rawData.insulinType.split(' ')[0] || 'Insulina';
+                        else if (log.type === 'medication') title = log.rawData.name;
+                        else if (log.type === 'glucose') title = 'Glicose';
+                        else if (log.type === 'activity') title = 'Atividade';
+
+                        const value = log.value;
+
+                        doc.setFontSize(11);
+                        doc.setTextColor(55, 65, 81);
+                        doc.setFont(undefined, 'bold');
+                        doc.text(time, 20, y);
+                        doc.setFont(undefined, 'normal');
+                        doc.text(title, 45, y);
+                        doc.setFont(undefined, 'bold');
+                        doc.text(value, docWidth - 20, y, { align: 'right' });
+                        y += 6;
+                        doc.setFont(undefined, 'normal');
+
+                        let details = '';
+                        if (log.type === 'meal' && log.rawData.items && log.rawData.items.length > 0) {
+                            details += 'Itens: ' + log.rawData.items.map(item => `${item.food.name} (x${item.quantity})`).join(', ');
+                        }
+                        if (log.rawData.notes) {
+                            details += (details ? ' | ' : '') + `Nota: ${log.rawData.notes}`;
+                        }
+
+                        if (details) {
+                            doc.setFontSize(9);
+                            doc.setTextColor(107, 114, 128);
+                            const splitDetails = doc.splitTextToSize(details, docWidth - 70);
+                            doc.text(splitDetails, 45, y);
+                            y += splitDetails.length * 4;
+                        }
+
+                        y += 3;
+                    });
+                    y += 5; // Espaço entre os dias
+                }
 
                 doc.save(`Relatorio_Diabetes_${formattedStartDate}_a_${formattedEndDate}.pdf`); 
                 showToast("Relatório PDF exportado com sucesso!");
@@ -2385,4 +2457,5 @@
     </script>
 </body>
 </html>
+
 
